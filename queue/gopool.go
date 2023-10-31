@@ -118,8 +118,13 @@ Loop:
 			}
 			p.idle = false
 		case <-timeout.C:
-			for p.idle && p.countWorker > 0 {
-				p.stops()
+			if p.idle && p.countWorker > 0 {
+				select {
+				case p.workQueue <- nil:
+					p.countWorker--
+				default:
+					break
+				}
 			}
 			p.idle = true
 			timeout.Reset(time.Second * 3)
@@ -141,10 +146,17 @@ func (p *Pool) work(task func(...interface{}), c chan func(v ...interface{}), wg
 
 func (p *Pool) Stop(ctx context.Context) {
 	//关闭
-	p.stops()
-	close(p.workQueue)
-	close(p.waitQueue.channel)
-	close(p.taskQueue)
+	p.once.Do(func() {
+		p.stops()
+		close(p.workQueue)
+		close(p.waitQueue.channel)
+		close(p.taskQueue)
+		// workers.
+		p.look.Lock()
+		p.status = stop
+		p.look.Unlock()
+		close(p.taskQueue)
+	})
 
 }
 
