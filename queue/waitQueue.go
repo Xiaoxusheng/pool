@@ -29,7 +29,7 @@ func (w *Wait) cusmer(c chan func(v ...interface{})) {
 		case task, ok := <-w.channel:
 			//ok为nil是是推出的信号，关闭等待队列
 			if !ok {
-				close(w.channel)
+				continue
 			}
 			c <- task
 		default:

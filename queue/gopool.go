@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"time"
 )
 
 const (
@@ -30,6 +31,8 @@ type Pool struct {
 	status int
 	//执行一次
 	once sync.Once
+	//id
+	idle bool
 }
 
 /*
@@ -78,6 +81,7 @@ func (p *Pool) Len() int {
 
 func (p *Pool) Star(ctx context.Context) {
 	var wg = sync.WaitGroup{}
+	timeout := time.NewTimer(time.Second * 3)
 
 Loop:
 	//	核心方法
@@ -112,12 +116,18 @@ Loop:
 					break Loop
 				}
 			}
-
+			p.idle = false
+		case <-timeout.C:
+			for p.idle && p.countWorker > 0 {
+				p.stops()
+			}
+			p.idle = true
+			timeout.Reset(time.Second * 3)
 		}
 	}
 
-	p.stops()
-
+	p.Stop(context.Background())
+	timeout.Stop()
 	wg.Wait()
 }
 
@@ -131,7 +141,10 @@ func (p *Pool) work(task func(...interface{}), c chan func(v ...interface{}), wg
 
 func (p *Pool) Stop(ctx context.Context) {
 	//关闭
+	p.stops()
 	close(p.workQueue)
+	close(p.waitQueue.channel)
+	close(p.taskQueue)
 
 }
 
