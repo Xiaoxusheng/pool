@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -20,11 +21,11 @@ type Pool struct {
 	//最大goroutine数量
 	maxWorker uint
 	//	taskQueue  任务队列
-	taskQueue chan func(...interface{})
+	taskQueue chan func(v ...any)
 	//waitQueue  等待队列
 	waitQueue *Wait
 	//	执行队列
-	workQueue chan func(...interface{})
+	workQueue chan func(v ...any)
 	//锁
 	look sync.Mutex
 	//	status 状态
@@ -43,14 +44,13 @@ type Pool struct {
 当新开一个协程就+1,如果已经到达最大数量，先放入等待队列中
 
 杀死协程的方法
-
-
 */
 
-func (p *Pool) NewPool(m, n uint) *Pool {
+// NewPool m是等待队列的最大任务数，n是最大协程数
+func NewPool(m, n uint) *Pool {
 	//n不能为0
 	if n <= 0 {
-		p.maxWorker = 1
+		n = 1
 	}
 	pool := &Pool{
 		countWorker: 0,
@@ -61,7 +61,7 @@ func (p *Pool) NewPool(m, n uint) *Pool {
 		status:      run,
 	}
 	//启动一个
-	go p.Star(context.Background())
+	go pool.Star(context.Background())
 	return pool
 }
 
@@ -71,11 +71,14 @@ func (p *Pool) Submit(ctx context.Context, f func(v ...interface{})) error {
 	}
 	if f != nil {
 		p.taskQueue <- f
+		return nil
 	}
 	return errors.New("f func(v ...interface{}) 不能为空！")
 }
 
 func (p *Pool) Len() int {
+	p.look.Lock()
+	defer p.look.Unlock()
 	return len(p.workQueue)
 }
 
@@ -94,6 +97,7 @@ Loop:
 		//	任务队列中
 		select {
 		case work, ok := <-p.taskQueue:
+			fmt.Println("阻塞", ok)
 			//不存在
 			if !ok {
 				break Loop
@@ -102,13 +106,14 @@ Loop:
 			select {
 			//新开一个goroutine
 			case p.workQueue <- work:
+			default:
 				//如果小于最大goroutine数目，新开一个
+				fmt.Println("新开一个")
 				if p.countWorker < p.maxWorker {
 					wg.Add(1)
-					go p.work(work, p.workQueue, &wg)
+					go p.work(ctx, work, p.workQueue, &wg)
 					p.countWorker++
 				}
-			default:
 				//    送进等待队列
 				ok := p.waitQueue.push(work)
 				if !ok {
@@ -136,7 +141,7 @@ Loop:
 	wg.Wait()
 }
 
-func (p *Pool) work(task func(...interface{}), c chan func(v ...interface{}), wg *sync.WaitGroup) {
+func (p *Pool) work(ctx context.Context, task func(...interface{}), c chan func(v ...interface{}), wg *sync.WaitGroup) {
 	for c != nil {
 		task()
 		task = <-c

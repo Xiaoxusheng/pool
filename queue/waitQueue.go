@@ -3,7 +3,7 @@ package queue
 // 等待队列
 type Wait struct {
 	Id      int
-	channel chan func(...interface{})
+	channel chan func(v ...any)
 }
 
 // 消费等待队列方法
