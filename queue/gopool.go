@@ -102,13 +102,14 @@ Loop:
 			if !ok {
 				break Loop
 			}
-			//存在,送入执行队列
+			//存在
 			select {
-			//新开一个goroutine
+			//放进执行队列
 			case p.workQueue <- work:
+			//	没有协程来接收，新开一个
 			default:
 				//如果小于最大goroutine数目，新开一个
-				fmt.Println("新开一个")
+				log.Println("新开一个", "当前协程数", p.countWorker)
 				if p.countWorker < p.maxWorker {
 					wg.Add(1)
 					go p.work(ctx, work, p.workQueue, &wg)
@@ -125,6 +126,7 @@ Loop:
 		case <-timeout.C:
 			if p.idle && p.countWorker > 0 {
 				select {
+				//管道中会有一个goroutine接收到nil，退出
 				case p.workQueue <- nil:
 					p.countWorker--
 				default:

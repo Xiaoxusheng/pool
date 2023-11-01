@@ -6,6 +6,7 @@ import (
 	"log"
 	"pool/queue"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -26,5 +27,6 @@ func main() {
 }
 
 func add(a, b, i int) {
+	time.Sleep(time.Second * 2)
 	fmt.Println("第"+strconv.Itoa(i)+"个任务执行完成", a+b)
 }
