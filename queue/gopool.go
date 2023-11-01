@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 )
@@ -34,6 +35,8 @@ type Pool struct {
 	once sync.Once
 	//id
 	idle bool
+	//	日志
+	*log.Logger
 }
 
 /*
@@ -59,6 +62,7 @@ func NewPool(m, n uint) *Pool {
 		waitQueue:   NewWait(m),
 		workQueue:   make(chan func(v ...interface{})),
 		status:      run,
+		Logger:      log.New(os.Stdout, "[pool]"+time.Now().Format(time.DateTime)+" ", log.Llongfile),
 	}
 	//启动一个
 	go pool.Star(context.Background())
@@ -92,67 +96,76 @@ Loop:
 		//等待队列里面不为空
 		if len(p.waitQueue.channel) > 0 {
 			//消费
+			p.Println("等待队列取出")
 			p.waitQueue.cusmer(p.workQueue)
 		}
 		//	任务队列中
 		select {
 		case work, ok := <-p.taskQueue:
-			fmt.Println("阻塞", ok)
+			p.Println("阻塞", ok)
 			//不存在
 			if !ok {
 				break Loop
 			}
-			//存在,送入执行队列
+			//存在
 			select {
-			//新开一个goroutine
+			//放进执行队列
 			case p.workQueue <- work:
+				fmt.Println("收入")
+			//	没有协程来接收，新开一个
 			default:
 				//如果小于最大goroutine数目，新开一个
-				fmt.Println("新开一个")
+
 				if p.countWorker < p.maxWorker {
+					p.Printf("当前协程数 %v", p.countWorker)
 					wg.Add(1)
 					go p.work(ctx, work, p.workQueue, &wg)
 					p.countWorker++
+				} else {
+					//    送进等待队列
+					p.Println("送入等待队列")
+					ok := p.waitQueue.push(work)
+					if !ok {
+						p.Println("waitQueue 容量过小！")
+						break Loop
+					}
 				}
-				//    送进等待队列
-				ok := p.waitQueue.push(work)
-				if !ok {
-					log.Println("waitQueue 容量过小！")
-					break Loop
-				}
+
 			}
 			p.idle = false
 		case <-timeout.C:
+			fmt.Println("timeout")
 			if p.idle && p.countWorker > 0 {
 				select {
+				//管道中会有一个goroutine接收到nil，退出
 				case p.workQueue <- nil:
 					p.countWorker--
-				default:
-					break
+					p.Println("当前协程池中协程数", p.countWorker)
 				}
+			} else if p.countWorker == 0 {
+				break Loop
 			}
 			p.idle = true
 			timeout.Reset(time.Second * 3)
 		}
 	}
-
+	//这个时候是将所以goroutine全部退出后在退出协程
 	p.Stop(context.Background())
 	timeout.Stop()
 	wg.Wait()
 }
 
 func (p *Pool) work(ctx context.Context, task func(...interface{}), c chan func(v ...interface{}), wg *sync.WaitGroup) {
-	for c != nil {
+	defer wg.Done()
+	for task != nil {
 		task()
 		task = <-c
 	}
-	wg.Done()
 }
 
 func (p *Pool) Stop(ctx context.Context) {
 	//关闭
 	p.once.Do(func() {
-		p.stops()
 		close(p.workQueue)
 		close(p.waitQueue.channel)
 		close(p.taskQueue)
@@ -160,7 +173,6 @@ func (p *Pool) Stop(ctx context.Context) {
 		p.look.Lock()
 		p.status = stop
 		p.look.Unlock()
-		close(p.taskQueue)
 	})
 
 }
@@ -170,4 +182,10 @@ func (p *Pool) stops() {
 		p.workQueue <- nil
 		p.countWorker--
 	}
+}
+
+func (p *Pool) Wait() {
+	for p.status != stop && p.countWorker != 0 {
+	}
+	p.Println("协程全部退出，关闭协程池")
 }

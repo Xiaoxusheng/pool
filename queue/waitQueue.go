@@ -1,5 +1,7 @@
 package queue
 
+import "fmt"
+
 // 等待队列
 type Wait struct {
 	Id      int
@@ -23,7 +25,7 @@ func (w *Wait) push(c func(v ...interface{})) bool {
 func (w *Wait) cusmer(c chan func(v ...interface{})) {
 	var t bool
 	for !t {
-		//考录任务队列容纳问题
+		//考虑任务队列容纳问题
 		//当任务队列c中阻塞放不下任务时，退出循环
 		select {
 		case task, ok := <-w.channel:
@@ -32,6 +34,7 @@ func (w *Wait) cusmer(c chan func(v ...interface{})) {
 				continue
 			}
 			c <- task
+			fmt.Println("等待队列取出")
 		default:
 			t = true
 		}

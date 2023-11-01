@@ -14,4 +14,5 @@ type Pools interface {
 	//Star 启动
 	Star(ctx context.Context)
 	//
+	Wait()
 }
