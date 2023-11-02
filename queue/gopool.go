@@ -58,9 +58,9 @@ func NewPool(m, n uint) *Pool {
 	pool := &Pool{
 		countWorker: 0,
 		maxWorker:   n,
-		taskQueue:   make(chan func(v ...interface{})),
+		taskQueue:   make(chan func(v ...any)),
 		waitQueue:   NewWait(m),
-		workQueue:   make(chan func(v ...interface{})),
+		workQueue:   make(chan func(v ...any)),
 		status:      run,
 		Logger:      log.New(os.Stdout, "[pool]"+time.Now().Format(time.DateTime)+" ", log.Llongfile),
 	}
@@ -97,7 +97,7 @@ Loop:
 		if len(p.waitQueue.channel) > 0 {
 			//消费
 			p.Println("等待队列取出")
-			p.waitQueue.cusmer(p.workQueue)
+			p.waitQueue.Cusmer(p.workQueue)
 		}
 		//	任务队列中
 		select {
@@ -124,7 +124,7 @@ Loop:
 				} else {
 					//    送进等待队列
 					p.Println("送入等待队列")
-					ok := p.waitQueue.push(work)
+					ok := p.waitQueue.Push(work)
 					if !ok {
 						p.Println("waitQueue 容量过小！")
 						break Loop
@@ -155,7 +155,7 @@ Loop:
 	wg.Wait()
 }
 
-func (p *Pool) work(ctx context.Context, task func(...interface{}), c chan func(v ...interface{}), wg *sync.WaitGroup) {
+func (p *Pool) work(ctx context.Context, task func(...any), c chan func(v ...any), wg *sync.WaitGroup) {
 	defer wg.Done()
 	for task != nil {
 		task()

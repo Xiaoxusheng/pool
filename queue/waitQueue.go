@@ -9,7 +9,7 @@ type Wait struct {
 }
 
 // 消费等待队列方法
-func (w *Wait) push(c func(v ...any)) bool {
+func (w *Wait) Push(c func(v ...any)) bool {
 	if len(w.channel) >= cap(w.channel) {
 		return false
 	}
@@ -22,7 +22,7 @@ func (w *Wait) push(c func(v ...any)) bool {
 }
 
 // 消费等待队列中的消息
-func (w *Wait) cusmer(c chan func(v ...any)) {
+func (w *Wait) Cusmer(c chan func(v ...any)) {
 	var t bool
 	for !t {
 		//考虑任务队列容纳问题
@@ -45,6 +45,6 @@ func (w *Wait) cusmer(c chan func(v ...any)) {
 func NewWait(m uint) *Wait {
 	return &Wait{
 		Id:      0,
-		channel: make(chan func(...interface{}), m),
+		channel: make(chan func(...any), m),
 	}
 }
