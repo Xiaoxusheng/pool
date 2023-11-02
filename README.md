@@ -10,6 +10,11 @@
 
 #### 3 用法
 
+
+```shell
+go get github.com/Xiaoxusheng/pool
+```
+
 ```go
 package main
 
