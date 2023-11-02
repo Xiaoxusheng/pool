@@ -64,12 +64,13 @@ func NewPool(m, n uint) *Pool {
 		status:      run,
 		Logger:      log.New(os.Stdout, "[pool]"+time.Now().Format(time.DateTime)+" ", log.Llongfile),
 	}
+
 	//启动一个
 	go pool.Star(context.Background())
 	return pool
 }
 
-func (p *Pool) Submit(ctx context.Context, f func(v ...interface{})) error {
+func (p *Pool) Submit(ctx context.Context, f func(v ...any)) error {
 	if p.status == stop {
 		return errors.New("pool池已经关闭！")
 	}
@@ -97,7 +98,7 @@ Loop:
 		if len(p.waitQueue.channel) > 0 {
 			//消费
 			p.Println("等待队列取出")
-			p.waitQueue.Cusmer(p.workQueue)
+			p.waitQueue.cusmer(p.workQueue)
 		}
 		//	任务队列中
 		select {
@@ -124,7 +125,7 @@ Loop:
 				} else {
 					//    送进等待队列
 					p.Println("送入等待队列")
-					ok := p.waitQueue.Push(work)
+					ok := p.waitQueue.push(work)
 					if !ok {
 						p.Println("waitQueue 容量过小！")
 						break Loop
