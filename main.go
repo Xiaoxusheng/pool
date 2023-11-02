@@ -15,7 +15,7 @@ func main() {
 
 	for i := 0; i < 300; i++ {
 		i = i
-		err := pool.Submit(ctx, func(v ...interface{}) {
+		err := pool.Submit(ctx, func(v ...any) {
 			log.Println(i)
 			add(1, 2, i)
 		})
