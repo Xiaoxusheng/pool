@@ -16,7 +16,7 @@ package main
 import (
 	"context"
 	"log"
-	"pool/queue"
+	"github.com/Xiaoxusheng/pool/queue"
 )
 
 func main() {
